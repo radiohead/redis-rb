@@ -1645,6 +1645,7 @@ class Redis
   #   - `:weights => [Float, Float, ...]`: weights to associate with source
   #   sorted sets
   #   - `:aggregate => String`: aggregate function to use (sum, min, max, ...)
+  #   - `:ranges => [Integer, Integer, ...]`: intersect only given ranges of sets
   # @return [Fixnum] number of elements in the resulting sorted set
   def zinterstore(destination, keys, options = {})
     args = []
@@ -1654,6 +1655,18 @@ class Redis
 
     aggregate = options[:aggregate]
     args.concat ["AGGREGATE", aggregate] if aggregate
+
+    ranges = options[:ranges]
+    if ranges
+      # There must be two range args per one key
+      # if any range is missing replace it with `+inf` or `-inf`
+      # accorging to position.
+      (keys.size * 2 - ranges.size).times do |t| 
+        (keys.size + t).even? ? ranges.push('-inf') : ranges.push('+inf')
+      end
+
+      args.concat ["RANGES", ranges]
+    end
 
     synchronize do |client|
       client.call [:zinterstore, destination, keys.size, *(keys + args)]
